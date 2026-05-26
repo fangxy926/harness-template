@@ -1,6 +1,6 @@
 # 产品需求文档(PRD)
 
-> REQ 索引,只引用 docs/specs/ 和 docs/plans/ 路径,不复制内容。
+> REQ 索引,只引用 docs/superpowers/specs/ 和 docs/superpowers/plans/ 路径,不复制内容。
 > 由 Stop hook 自动维护。
 
 ## 当前需求

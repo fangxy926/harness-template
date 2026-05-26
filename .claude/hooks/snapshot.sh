@@ -6,7 +6,7 @@ git diff HEAD > ".claude/snapshots/diff_${TIMESTAMP}.patch" 2>/dev/null
 git status --porcelain > ".claude/snapshots/status_${TIMESTAMP}.txt" 2>/dev/null
 
 # 受保护路径正则
-PROTECTED_REGEX="^(docs/specs/|docs/plans/|\.claude/plugins/|\.claude/skills/)"
+PROTECTED_REGEX="^(docs/superpowers/specs/|docs/superpowers/plans/|\.claude/plugins/|\.claude/skills/)"
 
 if git diff --name-only HEAD 2>/dev/null | grep -E "$PROTECTED_REGEX" > /dev/null; then
   echo "[$(date)] WARN: 受保护路径出现变更,请人工核查" >> .claude/snapshots/protected-paths.log
