@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录</title>
+  <style>
+    /* Task 2 将填充此处 */
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>登录</h1>
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="username">用户名</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          autocomplete="username"
+          placeholder="请输入用户名"
+        />
+      </div>
+      <div class="field password-field">
+        <label for="password">密码</label>
+        <div class="password-wrapper">
+          <input
+            type="password"
+            id="password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="请输入密码"
+          />
+          <button type="button" id="toggle-pwd" aria-label="切换密码可见性">👁</button>
+        </div>
+      </div>
+      <p class="error-msg" id="error-msg" role="alert"></p>
+      <button type="submit" id="submit-btn">登录</button>
+    </form>
+  </div>
+
+  <script>
+    /* Task 3 将填充此处 */
+  </script>
+</body>
+</html>
