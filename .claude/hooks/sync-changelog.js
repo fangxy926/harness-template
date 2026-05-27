@@ -64,6 +64,71 @@ function saveState(state) {
   catch (e) { dbg('ERROR saving hook state:', e.message); }
 }
 
+// ─── 变更描述提取 ──────────────────────────────────────────────────────────────
+
+/**
+ * 从 tool_input 自动提取简要变更描述，用于 CHANGELOG 条目。
+ *
+ * Write（新文件）：
+ *   - HTML → 提取 <title> 内容
+ *   - 其他 → 提取首行有意义的注释或代码行
+ *
+ * Edit（修改）：
+ *   - 1 行新增、0 行删除 → "+新增内容"
+ *   - 0 行新增、1 行删除 → "-删除内容"
+ *   - 1 行新增、1 行删除 → "旧 → 新"
+ *   - 多行变化            → "+N 行 -M 行"
+ */
+function extractChangeDescription(toolName, toolInput) {
+  try {
+    if (toolName === 'Write') {
+      const content = toolInput.content || '';
+      // HTML：提取 <title>
+      const titleMatch = content.match(/<title>([^<]+)<\/title>/i);
+      if (titleMatch) return titleMatch[1].trim().slice(0, 60);
+      // 首行有意义的注释或代码
+      for (const raw of content.split('\n')) {
+        const t = raw.trim();
+        if (!t || t.length < 4) continue;
+        if (/^(<!DOCTYPE|<html|<head|<body|\{|\}|\/\*\*?\s*$|\*\/|\*\s*$)/i.test(t)) continue;
+        const fromComment = t.match(/^(?:\/\/|#|\/\*+)\s*(.{3,})/);
+        if (fromComment) return fromComment[1].replace(/\*+\/$/, '').trim().slice(0, 60);
+        return t.slice(0, 60);
+      }
+      return `新建 ${content.split('\n').length} 行`;
+    }
+
+    if (toolName === 'Edit') {
+      const oldSet = new Set(
+        (toolInput.old_string || '').split('\n').map(l => l.trim()).filter(l => l.length > 2)
+      );
+      const newArr = (toolInput.new_string || '').split('\n').map(l => l.trim()).filter(l => l.length > 2);
+      const newSet = new Set(newArr);
+
+      const added   = newArr.filter(l => !oldSet.has(l));
+      const removed = [...oldSet].filter(l => !newSet.has(l));
+
+      // 过滤掉纯符号行（括号、分号等）
+      const isMere = l => /^[{}();,\[\]<>/!]+$/.test(l);
+      const sigA = added.filter(l => !isMere(l));
+      const sigR = removed.filter(l => !isMere(l));
+      const a = sigA.length || added.length;
+      const r = sigR.length || removed.length;
+      const aFirst = (sigA[0] || added[0] || '').slice(0, 50);
+      const rFirst = (sigR[0] || removed[0] || '').slice(0, 30);
+
+      if (a === 1 && r === 0) return `+${aFirst}`;
+      if (a === 0 && r === 1) return `-${rFirst}`;
+      if (a === 1 && r === 1) return `${rFirst} → ${aFirst}`;
+      const parts = [];
+      if (a > 0) parts.push(`+${a} 行`);
+      if (r > 0) parts.push(`-${r} 行`);
+      return parts.join(' ') || '结构/格式调整';
+    }
+  } catch (e) { dbg('extractDesc error:', e.message); }
+  return '';
+}
+
 // ─── PRD 工具函数 ──────────────────────────────────────────────────────────────
 
 /**
@@ -193,13 +258,16 @@ process.stdin.on('end', () => {
     dbg('activeReq=' + (activeReq ? activeReq.id : 'none'));
 
     // ── 写入 CHANGELOG ──────────────────────────────────────────────────────────
-    // 格式：- YYYY-MM-DD 动作 `文件名` (需求标题)   ← 有关联需求时才加括号
+    // 格式：- YYYY-MM-DD 动作 `文件名`：<简要描述> (需求标题)
+    //       有关联需求时才加括号；无法提取描述时省略冒号部分
+    const desc = extractChangeDescription(data.tool_name, data.tool_input || {});
+    const descStr  = desc ? `：${desc}` : '';
     const reqSuffix = activeReq ? ` (${activeReq.id})` : '';
     const newChangelogContent = changelogContent.replace(
       section,
-      `${section}\n- ${today()} ${verb} \`${fileName}\`${reqSuffix}`
+      `${section}\n- ${today()} ${verb} \`${fileName}\`${descStr}${reqSuffix}`
     );
-    dbg('WRITING CHANGELOG: ' + today() + ' ' + verb + ' ' + fileName + reqSuffix);
+    dbg('WRITING CHANGELOG: ' + today() + ' ' + verb + ' ' + fileName + descStr + reqSuffix);
     writeFile('docs/CHANGELOG.md', newChangelogContent);
     dbg('CHANGELOG updated successfully');
 
