@@ -1,31 +1,77 @@
-# 项目协作规则
+# Project Collaboration Rules
 
-## 文档体系
-- `docs/PRD.md`:产品需求索引(要什么、为什么),通过 REQ-ID 关联到下游
-- `docs/superpowers/specs/`:Superpowers 产出的技术规范详情(怎么实现),只读
-- `docs/superpowers/plans/`:Superpowers 产出的实施计划,只读
-- `docs/CHANGELOG.md`:代码变更记录,关联 REQ-ID
-- 追溯链:PRD(为什么)→ Spec(是什么)→ Plan(怎么做)→ CHANGELOG(做了什么)
+## Document Structure
 
-## REQ-ID 规则
-- 格式:REQ-XXX(三位数字递增)
-- 已废弃需求标记 [Deprecated],移到 ## 已废弃 区,不删除
+- `docs/PRD.md` — requirement index (what & why), linked to downstream via requirement titles
+- `docs/superpowers/specs/` — Superpowers-generated technical specs (how to implement), **read-only**
+- `docs/superpowers/plans/` — Superpowers-generated implementation plans, **read-only**
+- `docs/CHANGELOG.md` — code change log, linked to requirement titles
+- Traceability chain: PRD (why) → Spec (what) → Plan (how) → CHANGELOG (done)
 
-## 文件所有权边界
+## Requirement Title Format
 
-### 收保护的文件(严禁修改)
-- docs/superpowers/specs/ 下所有文件
-- docs/superpowers/plans/ 下所有文件
+- Pattern: `YYYY-MM-DD-<brief description>` (e.g. `2026-05-27-login-page`)
+- Deprecated requirements are marked `[Deprecated]` and moved to the `## Deprecated` section — never deleted
 
-### 本项目拥有
-- docs/PRD.md
-- docs/CHANGELOG.md
+## File Ownership
 
-## TDD 与 CHANGELOG
-- 红灯阶段(仅测试文件变更)不写 CHANGELOG
-- 绿灯/refactor 阶段且 code-reviewer 通过后,视为完成工作单元
+### Protected (do not modify)
+- All files under `docs/superpowers/specs/`
+- All files under `docs/superpowers/plans/`
 
-## 维护流程
-- PRD/CHANGELOG 由 `.claude/settings.json` 的 PostToolUse hook(挂在 Edit/Write/NotebookEdit 上)调度的文档同步 agent 自动维护
-- 该 agent 仅在文件实际变更后触发,brainstorming 等纯对话轮次不会跑
-- 红灯阶段(仅测试文件)不触发任何记录,等绿灯阶段一次性写入 CHANGELOG
+### Project-owned (writable)
+- `docs/PRD.md`
+- `docs/CHANGELOG.md`
+
+## TDD and CHANGELOG
+
+- Red phase (only test files changed) — do **not** write CHANGELOG
+- Green / refactor phase after code-reviewer approval — mark work unit as complete
+
+## Automated Hook Maintenance
+
+`docs/PRD.md` and `docs/CHANGELOG.md` are maintained automatically by two **PostToolUse** hooks registered in `.claude/settings.json`. Both hooks fire **immediately after every `Edit` / `Write` / `NotebookEdit` tool call** — not at the end of a conversation turn.
+
+### sync-prd.js — PRD maintenance
+
+**Triggers when**: the file path contains `docs/superpowers/specs/` or `docs/superpowers/plans/`.  
+Exits immediately for all other files (no-op).
+
+| File written | Action |
+|--------------|--------|
+| New `specs/*.md` | Appends a new requirement entry to `## Current Requirements` in PRD.md. Heading: `YYYY-MM-DD-<first # title from spec>` |
+| New `plans/*.md` | Finds the matching REQ entry by spec filename reference; inserts the Plan path |
+| Plan with no matching spec | Appends to `## To Triage` section for manual follow-up |
+
+### sync-changelog.js — CHANGELOG maintenance
+
+**Triggers when**: the file is **not** any of the following (exits immediately otherwise):
+- `docs/superpowers/specs/` or `docs/superpowers/plans/` (handled by sync-prd.js)
+- `docs/PRD.md` or `docs/CHANGELOG.md` (prevents infinite loop)
+- Anything under `.claude/` (internal hook files, config, state)
+- Test files matching `*.test.*`, `*_test.*`, `tests/`, `__tests__/`, `spec/`
+
+When triggered:
+
+| Tool used | CHANGELOG section |
+|-----------|------------------|
+| `Write` (new file) | `### Added` |
+| `Edit` (modified file) | `### Changed` |
+
+**Entry format:**
+
+```
+- YYYY-MM-DD verb `filename`：description (requirement title)
+```
+
+- **Description** — auto-extracted from tool input:
+  - Single line change → `old value → new value`
+  - Single line added → `+added content`
+  - Multi-line → `+N lines -M lines`
+  - New HTML file → content of `<title>` tag
+  - New other file → first meaningful comment line
+- **Requirement title** — read from the first "待实施" or "实施中" entry in PRD.md; omitted (no parentheses) if no active requirement found
+- **PRD status promotion** — on first production file write, automatically changes the matching PRD entry from `待实施` → `实施中`
+
+**Session deduplication:**  
+Within the same Claude Code session, the same file + same verb (new/modified) is recorded only once, preventing duplicate entries from batch edits. A new session (e.g. bug fix the next day) resets the dedup state automatically. State is stored in `.claude/hook-state.json` (gitignored).

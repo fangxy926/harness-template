@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- 2026-05-27 新增 `CLAUDE.md`：Project Collaboration Rules
+- 2026-05-27 新增 `README.md`：Harness Template
 ### Changed
 ### Fixed
 ### Removed
