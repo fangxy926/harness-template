@@ -24,3 +24,8 @@
 ## TDD 与 CHANGELOG
 - 红灯阶段(仅测试文件变更)不写 CHANGELOG
 - 绿灯/refactor 阶段且 code-reviewer 通过后,视为完成工作单元
+
+## 维护流程
+- PRD/CHANGELOG 由 `.claude/settings.json` 的 PostToolUse hook(挂在 Edit/Write/NotebookEdit 上)调度的文档同步 agent 自动维护
+- 该 agent 仅在文件实际变更后触发,brainstorming 等纯对话轮次不会跑
+- 红灯阶段(仅测试文件)不触发任何记录,等绿灯阶段一次性写入 CHANGELOG
