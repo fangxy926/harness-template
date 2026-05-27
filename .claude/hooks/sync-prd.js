@@ -113,8 +113,8 @@ function handlePlan(filePath, prdContent) {
     return null;
   }
 
-  const head = planContent.split('\n').slice(0, 80).join('\n');
-  const specMatch = head.match(/docs\/superpowers\/specs\/([\w\-\.]+\.md)/);
+  // 全文搜索 spec 引用（不限行数）
+  const specMatch = planContent.match(/docs\/superpowers\/specs\/([\w\-\.]+\.md)/);
   if (!specMatch) {
     dbg('SKIP: no spec reference in plan');
     return null;
