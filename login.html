@@ -5,7 +5,130 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>登录</title>
   <style>
-    /* Task 2 将填充此处 */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #1e1e2e;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .field {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      color: #1e1e2e;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      border-color: #4F46E5;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .password-wrapper input[type="password"],
+    .password-wrapper input[type="text"] {
+      padding-right: 44px;
+    }
+
+    #toggle-pwd {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 2px;
+      color: #6b7280;
+    }
+
+    #toggle-pwd:hover {
+      color: #4F46E5;
+    }
+
+    .error-msg {
+      font-size: 0.875rem;
+      color: #ef4444;
+      min-height: 1.25rem;
+      margin-bottom: 12px;
+    }
+
+    #submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: #4F46E5;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    #submit-btn:hover:not(:disabled) {
+      background: #4338ca;
+    }
+
+    #submit-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .success-msg {
+      color: #16a34a;
+      font-weight: 600;
+      text-align: center;
+      margin-top: 12px;
+      font-size: 1rem;
+    }
   </style>
 </head>
 <body>
