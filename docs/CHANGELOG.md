@@ -5,8 +5,10 @@
 ## [Unreleased]
 
 ### Added
-- REQ-001: 完成登录页面实现，包含纯 HTML + CSS + JS，支持用户名/密码验证、密码可见性切换、登录模拟流程
+- 新增 `login.html` (REQ-001)
 
 ### Changed
+- 更新 `.gitignore` (REQ-001)
+- 更新 `login.html` (REQ-001)
 ### Fixed
 ### Removed

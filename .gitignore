@@ -1,4 +1,5 @@
 .claude/snapshots/
 .claude/hook-debug.log
+.claude/hook-state.json
 .omc/
 .venv/

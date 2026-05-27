@@ -9,7 +9,7 @@
 ### REQ-001: 登录页面设计文档
 - **Spec**: docs/superpowers/specs/2026-05-27-login-design.md
 - **Plan**: docs/superpowers/plans/2026-05-27-login.md
-- **状态**: 已完成
+- **状态**: 实施中
 - **创建**: 2026-05-27
 - **摘要**: 为 Web 前端单页应用提供一个自包含的静态登录页面，使用纯 HTML + CSS + JS 实现，零依赖，无需构建工具。
 
