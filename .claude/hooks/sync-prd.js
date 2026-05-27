@@ -60,18 +60,9 @@ function extractSummary(content) {
   return buf.trim().slice(0, 150);
 }
 
-function nextReqNum(prdContent) {
-  const matches = prdContent.match(/REQ-(\d+)/g) || [];
-  const max = matches.reduce((m, r) => {
-    const n = parseInt(r.slice(4));
-    return n > m ? n : m;
-  }, 0);
-  return String(max + 1).padStart(3, '0');
-}
-
 // ─── 处理函数 ──────────────────────────────────────────────────────────────────
 
-/** 处理新 spec 文件 → 在 PRD 追加 REQ 条目 */
+/** 处理新 spec 文件 → 在 PRD 追加需求条目 */
 function handleSpec(filePath, prdContent) {
   const fileName = path.basename(filePath);
   dbg('handleSpec fileName=' + fileName);
@@ -87,17 +78,17 @@ function handleSpec(filePath, prdContent) {
 
   const title = extractTitle(specContent);
   const summary = extractSummary(specContent);
-  const num = nextReqNum(prdContent);
+  const reqHeading = today() + '-' + title;   // e.g. 2026-05-27-登录页面设计文档
   const anchor = '<!-- REQ 条目自动追加于此 -->';
 
-  dbg('title=' + title + ' num=' + num + ' anchor_found=' + prdContent.includes(anchor));
+  dbg('reqHeading=' + reqHeading + ' anchor_found=' + prdContent.includes(anchor));
 
   if (!prdContent.includes(anchor)) {
     dbg('ERROR: anchor not found in PRD');
     return null;
   }
 
-  const entry = `\n### REQ-${num}: ${title}\n- **Spec**: ${filePath}\n- **状态**: 待实施\n- **创建**: ${today()}\n- **摘要**: ${summary}\n`;
+  const entry = `\n### ${reqHeading}\n- **Spec**: ${filePath}\n- **状态**: 待实施\n- **创建**: ${today()}\n- **摘要**: ${summary}\n`;
   return prdContent.replace(anchor, anchor + entry);
 }
 

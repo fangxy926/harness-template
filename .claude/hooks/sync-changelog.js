@@ -40,6 +40,10 @@ function writeFile(relPath, content) {
   fs.writeFileSync(path.join(PROJECT_ROOT, relPath), content, 'utf8');
 }
 
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
 // ─── Session 级去重 ────────────────────────────────────────────────────────────
 
 /**
@@ -63,31 +67,32 @@ function saveState(state) {
 // ─── PRD 工具函数 ──────────────────────────────────────────────────────────────
 
 /**
- * 从 PRD 内容中找第一个处于"待实施"或"实施中"状态的 REQ-ID。
- * 返回 { id: 'REQ-001', status: '待实施' } 或 null。
+ * 从 PRD 内容中找第一个处于"待实施"或"实施中"状态的需求。
+ * 标题格式：### YYYY-MM-DD-<需求简要描述>
+ * 返回 { id: 'YYYY-MM-DD-标题', status: '待实施' } 或 null。
  */
 function findActiveReq(prdContent) {
-  const reqHeaderRe = /### (REQ-\d+):/g;
+  const reqHeaderRe = /### (\d{4}-\d{2}-\d{2}-.+)/g;
   let match;
   while ((match = reqHeaderRe.exec(prdContent)) !== null) {
-    const reqId = match[1];
+    const reqTitle = match[1].trim();
     const block = prdContent.slice(match.index, prdContent.indexOf('\n###', match.index + 1) >>> 0 || undefined);
     const statusMatch = block.match(/\*\*状态\*\*:\s*(待实施|实施中)/);
     if (statusMatch) {
-      return { id: reqId, status: statusMatch[1] };
+      return { id: reqTitle, status: statusMatch[1] };
     }
   }
   return null;
 }
 
 /**
- * 将 PRD 中指定 REQ 的状态从"待实施"改为"实施中"。
+ * 将 PRD 中指定需求的状态从"待实施"改为"实施中"。
  * 返回更新后的 PRD 内容，若无需更新则返回 null。
  */
 function promotePrdStatus(prdContent, activeReq) {
   if (!activeReq || activeReq.status !== '待实施') return null;
 
-  const reqBlockStart = prdContent.indexOf('### ' + activeReq.id + ':');
+  const reqBlockStart = prdContent.indexOf('### ' + activeReq.id);
   const reqBlockEnd = prdContent.indexOf('\n### ', reqBlockStart + 1);
   const reqBlock = reqBlockEnd > -1
     ? prdContent.slice(reqBlockStart, reqBlockEnd)
@@ -185,15 +190,16 @@ process.stdin.on('end', () => {
     catch (e) { dbg('ERROR reading PRD:', e.message); process.exit(0); }
 
     const activeReq = findActiveReq(prdContent);
-    const reqId = activeReq ? activeReq.id : '[需求待补]';
-    dbg('activeReq=' + reqId);
+    dbg('activeReq=' + (activeReq ? activeReq.id : 'none'));
 
     // ── 写入 CHANGELOG ──────────────────────────────────────────────────────────
+    // 格式：- YYYY-MM-DD 动作 `文件名` (需求标题)   ← 有关联需求时才加括号
+    const reqSuffix = activeReq ? ` (${activeReq.id})` : '';
     const newChangelogContent = changelogContent.replace(
       section,
-      `${section}\n- ${verb} \`${fileName}\` (${reqId})`
+      `${section}\n- ${today()} ${verb} \`${fileName}\`${reqSuffix}`
     );
-    dbg('WRITING CHANGELOG: ' + verb + ' ' + fileName + ' (' + reqId + ')');
+    dbg('WRITING CHANGELOG: ' + today() + ' ' + verb + ' ' + fileName + reqSuffix);
     writeFile('docs/CHANGELOG.md', newChangelogContent);
     dbg('CHANGELOG updated successfully');
 
