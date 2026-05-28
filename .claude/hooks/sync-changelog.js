@@ -132,6 +132,14 @@ function extractChangeDescription(toolName, toolInput) {
 // ─── PRD 工具函数 ──────────────────────────────────────────────────────────────
 
 /**
+ * 从 REQ 块中提取 Spec 路径，找不到返回 null。
+ */
+function extractSpecPath(block) {
+  const m = block.match(/\*\*Spec\*\*:\s*(\S+)/);
+  return m ? m[1] : null;
+}
+
+/**
  * 从 PRD 内容中找第一个处于"待实施"或"实施中"状态的需求（兜底用）。
  */
 function findActiveReq(prdContent) {
@@ -139,9 +147,10 @@ function findActiveReq(prdContent) {
   let match;
   while ((match = reqHeaderRe.exec(prdContent)) !== null) {
     const reqTitle = match[1].trim();
-    const block = prdContent.slice(match.index, prdContent.indexOf('\n###', match.index + 1) >>> 0 || undefined);
+    const blockEnd = prdContent.indexOf('\n###', match.index + 1);
+    const block = blockEnd > -1 ? prdContent.slice(match.index, blockEnd) : prdContent.slice(match.index);
     const statusMatch = block.match(/\*\*状态\*\*:\s*(待实施|实施中)/);
-    if (statusMatch) return { id: reqTitle, status: statusMatch[1] };
+    if (statusMatch) return { id: reqTitle, status: statusMatch[1], specPath: extractSpecPath(block) };
   }
   return null;
 }
@@ -183,7 +192,7 @@ function findReqByFile(filePath, prdContent) {
 
     if (statusMatch) {
       dbg(`findReqByFile: ${fileName} → plan=${planFile} → req=${reqTitle}`);
-      return { id: reqTitle, status: statusMatch[1] };
+      return { id: reqTitle, status: statusMatch[1], specPath: extractSpecPath(block) };
     }
   }
 
@@ -299,11 +308,15 @@ process.stdin.on('end', () => {
     dbg('activeReq=' + (activeReq ? activeReq.id : 'none'));
 
     // ── 写入 CHANGELOG ──────────────────────────────────────────────────────────
-    // 格式：- YYYY-MM-DD 动作 `文件名`：<简要描述> (需求标题)
-    //       有关联需求时才加括号；无法提取描述时省略冒号部分
+    // 格式：- YYYY-MM-DD 动作 `文件名`：<简要描述> ([需求标题](spec 路径))
+    //       有关联需求时才加括号；spec 路径缺失时降级为纯文本标题；无描述时省略冒号
     const desc = extractChangeDescription(data.tool_name, data.tool_input || {});
     const descStr  = desc ? `：${desc}` : '';
-    const reqSuffix = activeReq ? ` (${activeReq.id})` : '';
+    const reqSuffix = activeReq
+      ? (activeReq.specPath
+          ? ` ([${activeReq.id}](${activeReq.specPath}))`
+          : ` (${activeReq.id})`)
+      : '';
     const newChangelogContent = changelogContent.replace(
       section,
       `${section}\n- ${today()} ${verb} \`${fileName}\`${descStr}${reqSuffix}`

@@ -61,7 +61,7 @@ When triggered:
 **Entry format:**
 
 ```
-- YYYY-MM-DD verb `filename`：description (requirement title)
+- YYYY-MM-DD verb `filename`：description ([requirement title](spec path))
 ```
 
 - **Description** — auto-extracted from tool input:
@@ -70,7 +70,7 @@ When triggered:
   - Multi-line → `+N lines -M lines`
   - New HTML file → content of `<title>` tag
   - New other file → first meaningful comment line
-- **Requirement title** — read from the first "待实施" or "实施中" entry in PRD.md; omitted (no parentheses) if no active requirement found
+- **Requirement reference** — rendered as a markdown link `[title](spec path)` so the IDE can navigate to the spec. Resolved by locating the change's plan in PRD.md and reading the sibling `**Spec**:` line; falls back to the first `待实施` / `实施中` REQ. When no active REQ exists, the suffix (including parentheses) is omitted. If the matched REQ has no spec path (legacy data), it degrades to plain text `(title)`.
 - **PRD status promotion** — on first production file write, automatically changes the matching PRD entry from `待实施` → `实施中`
 
 **Session deduplication:**  
