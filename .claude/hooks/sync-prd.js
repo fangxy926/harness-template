@@ -88,7 +88,7 @@ function handleSpec(filePath, prdContent) {
     return null;
   }
 
-  const entry = `\n### ${reqHeading}\n- **Spec**: ${filePath}\n- **状态**: 待实施\n- **创建**: ${today()}\n- **摘要**: ${summary}\n`;
+  const entry = `\n### ${reqHeading}\n- **Spec**: ${filePath}\n- **摘要**: ${summary}\n`;
   return prdContent.replace(anchor, anchor + entry);
 }
 

@@ -173,20 +173,6 @@ function findReqByFiles(files, prdContent) {
   return { id: winner.reqTitle, specPath: winner.specPath };
 }
 
-// ─── PRD 状态升级 ──────────────────────────────────────────────────────────────
-
-function promotePrdStatus(prdContent, req) {
-  if (!req) return null;
-  const blockStart = prdContent.indexOf('### ' + req.id);
-  if (blockStart === -1) return null;
-  const blockEnd = prdContent.indexOf('\n### ', blockStart + 1);
-  const block    = blockEnd > -1 ? prdContent.slice(blockStart, blockEnd) : prdContent.slice(blockStart);
-  if (!block.includes('- **状态**: 待实施')) return null;
-  const updated  = block.replace('- **状态**: 待实施', '- **状态**: 实施中');
-  return blockEnd > -1
-    ? prdContent.slice(0, blockStart) + updated + prdContent.slice(blockEnd)
-    : prdContent.slice(0, blockStart) + updated;
-}
 
 // ─── main ────────────────────────────────────────────────────────────────────
 
@@ -238,7 +224,7 @@ process.stdin.on('end', () => {
     // ── 读 CHANGELOG / PRD ────────────────────────────────────────────────────
     let changelogContent, prdContent;
     try { changelogContent = readFile('docs/CHANGELOG.md'); } catch (e) { dbg('ERROR reading CHANGELOG:', e.message); process.exit(0); }
-    try { prdContent       = readFile('docs/PRD.md');        } catch (e) { dbg('ERROR reading PRD:', e.message); process.exit(0); }
+    try { prdContent       = readFile('docs/PRD.md');       } catch (e) { dbg('WARN: PRD not readable, req link skipped'); prdContent = ''; }
 
     const section   = getSection(subject);
     const shortHash = currentHash.slice(0, 7);
@@ -265,10 +251,6 @@ process.stdin.on('end', () => {
     dbg('WRITING entry: ' + entry);
     writeFile('docs/CHANGELOG.md', newChangelog);
     dbg('CHANGELOG updated');
-
-    // ── 更新 PRD 状态 ─────────────────────────────────────────────────────────
-    const newPrd = promotePrdStatus(prdContent, activeReq);
-    if (newPrd) { writeFile('docs/PRD.md', newPrd); dbg('PRD status updated'); }
 
     // ── 持久化已处理 hash ─────────────────────────────────────────────────────
     state.lastProcessedCommit = currentHash;
