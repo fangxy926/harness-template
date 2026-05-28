@@ -37,8 +37,10 @@ function writeFile(relPath, content) {
   fs.writeFileSync(path.join(PROJECT_ROOT, relPath), content, 'utf8');
 }
 
-function today() {
-  return new Date().toISOString().split('T')[0];
+function nowTimestamp() {
+  const d   = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 function run(cmd) {
@@ -58,15 +60,25 @@ function saveState(state) {
 // ─── CHANGELOG 区块 ────────────────────────────────────────────────────────────
 
 /**
- * 根据 conventional commit 前缀决定写入哪个区块。
- * feat → Added，fix/perf → Fixed，revert/remove → Removed，其余 → Changed
+ * 根据 conventional commit 前缀决定写入哪个区块，直接对应类型名。
+ * 未知类型回退到 ### chore。
  */
 function getSection(subject) {
-  const type = (subject.match(/^(\w+)[\(:!]/) || [])[1] || '';
-  if (/^feat$/.test(type))               return '### Added';
-  if (/^fix$|^perf$/.test(type))         return '### Fixed';
-  if (/^revert$|^remove$|^drop$/.test(type)) return '### Removed';
-  return '### Changed';
+  const type  = (subject.match(/^(\w+)[\(:!]/) || [])[1] || '';
+  const valid = ['feat','fix','docs','style','refactor','perf','test','chore'];
+  return `### ${valid.includes(type) ? type : 'chore'}`;
+}
+
+/**
+ * 若 section 不存在，将其插入 ## [Unreleased] 块尾（下一个 ## 之前）。
+ */
+function ensureSection(changelog, section) {
+  if (changelog.includes(section)) return changelog;
+  const unrelIdx = changelog.indexOf('## [Unreleased]');
+  if (unrelIdx === -1) return changelog + `\n${section}\n`;
+  const nextH2 = changelog.indexOf('\n## ', unrelIdx + 1);
+  const ins     = nextH2 > -1 ? nextH2 : changelog.length;
+  return changelog.slice(0, ins) + `\n${section}\n` + changelog.slice(ins);
 }
 
 // ─── 变更文件过滤 ──────────────────────────────────────────────────────────────
@@ -212,10 +224,8 @@ process.stdin.on('end', () => {
     try { changelogContent = readFile('docs/CHANGELOG.md'); } catch (e) { dbg('ERROR reading CHANGELOG:', e.message); process.exit(0); }
     try { prdContent       = readFile('docs/PRD.md');        } catch (e) { dbg('ERROR reading PRD:', e.message); process.exit(0); }
 
-    const section = getSection(subject);
-    if (!changelogContent.includes(section)) {
-      dbg('SKIP: section not found: ' + section); process.exit(0);
-    }
+    const section   = getSection(subject);
+    const shortHash = currentHash.slice(0, 7);
 
     // ── 查找 PRD 需求 ─────────────────────────────────────────────────────────
     const activeReq = findReqByFiles(changedFiles, prdContent);
@@ -232,9 +242,10 @@ process.stdin.on('end', () => {
       ? `\`${path.basename(changedFiles[0].file)}\``
       : `\`${path.basename(changedFiles[0].file)}\` 等 ${changedFiles.length} 个文件`;
 
-    const entry = `- ${today()} ${subject} (${fileLabel})${reqSuffix}`;
+    const entry = `- ${nowTimestamp()} \`${shortHash}\` ${subject} (${fileLabel})${reqSuffix}`;
 
-    const newChangelog = changelogContent.replace(section, `${section}\n${entry}`);
+    const withSection  = ensureSection(changelogContent, section);
+    const newChangelog = withSection.replace(section, `${section}\n${entry}`);
     dbg('WRITING entry: ' + entry);
     writeFile('docs/CHANGELOG.md', newChangelog);
     dbg('CHANGELOG updated');
