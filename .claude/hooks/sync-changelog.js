@@ -132,9 +132,7 @@ function extractChangeDescription(toolName, toolInput) {
 // ─── PRD 工具函数 ──────────────────────────────────────────────────────────────
 
 /**
- * 从 PRD 内容中找第一个处于"待实施"或"实施中"状态的需求。
- * 标题格式：### YYYY-MM-DD-<需求简要描述>
- * 返回 { id: 'YYYY-MM-DD-标题', status: '待实施' } 或 null。
+ * 从 PRD 内容中找第一个处于"待实施"或"实施中"状态的需求（兜底用）。
  */
 function findActiveReq(prdContent) {
   const reqHeaderRe = /### (\d{4}-\d{2}-\d{2}-.+)/g;
@@ -143,11 +141,54 @@ function findActiveReq(prdContent) {
     const reqTitle = match[1].trim();
     const block = prdContent.slice(match.index, prdContent.indexOf('\n###', match.index + 1) >>> 0 || undefined);
     const statusMatch = block.match(/\*\*状态\*\*:\s*(待实施|实施中)/);
+    if (statusMatch) return { id: reqTitle, status: statusMatch[1] };
+  }
+  return null;
+}
+
+/**
+ * 通过扫描 plan 文件，找哪个 plan 提到了当前变更文件名，
+ * 再通过 PRD 里的 **Plan** 引用定位对应需求。
+ * 找不到时回退到 findActiveReq（兜底）。
+ */
+function findReqByFile(filePath, prdContent) {
+  const fileName = path.basename(filePath);
+  const plansDir = path.join(PROJECT_ROOT, 'docs', 'superpowers', 'plans');
+
+  let planFiles;
+  try { planFiles = fs.readdirSync(plansDir).filter(f => f.endsWith('.md')); }
+  catch (e) { dbg('ERROR reading plans dir:', e.message); return findActiveReq(prdContent); }
+
+  for (const planFile of planFiles) {
+    let planContent;
+    try { planContent = fs.readFileSync(path.join(PROJECT_ROOT, 'docs/superpowers/plans', planFile), 'utf8'); }
+    catch (e) { continue; }
+
+    if (!planContent.includes(fileName)) continue;
+
+    // 在 PRD 中找到这个 plan 的引用行，然后往前找最近的需求标题
+    const planRef = `docs/superpowers/plans/${planFile}`;
+    const planLineIdx = prdContent.indexOf(`**Plan**: ${planRef}`);
+    if (planLineIdx === -1) continue;
+
+    const before = prdContent.slice(0, planLineIdx);
+    const reqHeadings = [...before.matchAll(/### (\d{4}-\d{2}-\d{2}-[^\n]+)/g)];
+    if (!reqHeadings.length) continue;
+
+    const reqTitle = reqHeadings[reqHeadings.length - 1][1].trim();
+    const blockStart = prdContent.lastIndexOf('### ' + reqTitle, planLineIdx);
+    const blockEnd = prdContent.indexOf('\n### ', blockStart + 1);
+    const block = blockEnd > -1 ? prdContent.slice(blockStart, blockEnd) : prdContent.slice(blockStart);
+    const statusMatch = block.match(/\*\*状态\*\*:\s*(待实施|实施中)/);
+
     if (statusMatch) {
+      dbg(`findReqByFile: ${fileName} → plan=${planFile} → req=${reqTitle}`);
       return { id: reqTitle, status: statusMatch[1] };
     }
   }
-  return null;
+
+  dbg('findReqByFile: no plan match, falling back to findActiveReq');
+  return findActiveReq(prdContent);
 }
 
 /**
@@ -254,7 +295,7 @@ process.stdin.on('end', () => {
     try { prdContent = readFile('docs/PRD.md'); }
     catch (e) { dbg('ERROR reading PRD:', e.message); process.exit(0); }
 
-    const activeReq = findActiveReq(prdContent);
+    const activeReq = findReqByFile(filePath, prdContent);
     dbg('activeReq=' + (activeReq ? activeReq.id : 'none'));
 
     // ── 写入 CHANGELOG ──────────────────────────────────────────────────────────

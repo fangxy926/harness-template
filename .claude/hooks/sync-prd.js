@@ -92,6 +92,64 @@ function handleSpec(filePath, prdContent) {
   return prdContent.replace(anchor, anchor + entry);
 }
 
+/**
+ * 根据 plan 文件名自动匹配对应 spec 文件。
+ *
+ * 命名约定（brainstorming skill）：
+ *   spec → YYYY-MM-DD-<topic>-design.md
+ *   plan → YYYY-MM-DD-<topic>.md
+ *
+ * 匹配优先级（同一日期有多个 spec 时）：
+ *   1. 精确匹配：spec 去掉已知设计后缀（-design/-spec/-requirements）后 === plan 主体名
+ *   2. 前缀匹配：spec 主体名以 plan 主体名开头（兼容未带后缀的 spec）
+ *   3. 以上均无匹配 → 返回 null（记为孤儿 plan）
+ */
+const DESIGN_SUFFIXES = ['-design', '-spec', '-requirements'];
+
+function stripDesignSuffix(name) {
+  for (const suf of DESIGN_SUFFIXES) {
+    if (name.endsWith(suf)) return name.slice(0, -suf.length);
+  }
+  return name;
+}
+
+function findMatchingSpec(planFilePath) {
+  const planBase = path.basename(planFilePath, '.md'); // e.g. "2026-05-28-login-page"
+  const dateMatch = planBase.match(/^(\d{4}-\d{2}-\d{2})-(.+)$/);
+  if (!dateMatch) { dbg('findMatchingSpec: no date in plan filename'); return null; }
+
+  const [, date, planTopic] = dateMatch; // planTopic = "login-page"
+  const specsDir = path.join(PROJECT_ROOT, 'docs', 'superpowers', 'specs');
+
+  let specFiles;
+  try { specFiles = fs.readdirSync(specsDir).filter(f => f.endsWith('.md')); }
+  catch (e) { dbg('ERROR reading specs dir:', e.message); return null; }
+
+  const sameDateSpecs = specFiles.filter(f => f.startsWith(date + '-'));
+  dbg('sameDateSpecs=' + sameDateSpecs.join(','));
+
+  if (sameDateSpecs.length === 0) return null;
+  if (sameDateSpecs.length === 1) return sameDateSpecs[0];
+
+  // 精确匹配：去掉 -design 等后缀后 topic 完全一致
+  const exact = sameDateSpecs.find(f => {
+    const specTopic = stripDesignSuffix(path.basename(f, '.md').slice(date.length + 1));
+    dbg(`  exact check: specTopic=${specTopic} planTopic=${planTopic}`);
+    return specTopic === planTopic;
+  });
+  if (exact) { dbg('matched (exact): ' + exact); return exact; }
+
+  // 前缀匹配（兼容 spec 无标准后缀的情况）
+  const prefix = sameDateSpecs.find(f => {
+    const specTopic = path.basename(f, '.md').slice(date.length + 1);
+    return specTopic.startsWith(planTopic);
+  });
+  if (prefix) { dbg('matched (prefix): ' + prefix); return prefix; }
+
+  dbg('no match found among same-date specs');
+  return null;
+}
+
 /** 处理新 plan 文件 → 在对应 REQ 条目追加 Plan 字段 */
 function handlePlan(filePath, prdContent) {
   dbg('handlePlan filePath=' + filePath);
@@ -101,18 +159,17 @@ function handlePlan(filePath, prdContent) {
     return null;
   }
 
-  let planContent;
-  try { planContent = readFile(filePath); }
-  catch (e) { dbg('ERROR reading plan:', e.message); return null; }
-
-  const specMatch = planContent.match(/docs\/superpowers\/specs\/([\w\-\.]+\.md)/);
-  if (!specMatch) {
-    dbg('SKIP: no spec reference in plan');
-    return null;
+  const specFileName = findMatchingSpec(filePath);
+  if (!specFileName) {
+    dbg('SKIP: no matching spec found for plan');
+    const anchor = '<!-- 无法关联到 spec 的推断需求,等待人工正式化 -->';
+    if (!prdContent.includes(anchor)) return null;
+    const entry = `\n- **Plan 孤儿**: ${filePath}（无法匹配对应 spec）\n`;
+    dbg('adding orphan plan entry');
+    return prdContent.replace(anchor, anchor + entry);
   }
 
-  const specFileName = specMatch[1];
-  dbg('referenced spec=' + specFileName);
+  dbg('matched spec=' + specFileName);
 
   const specLineRe = new RegExp(
     `(\\- \\*\\*Spec\\*\\*: docs/superpowers/specs/${specFileName.replace(/\./g, '\\.')}[^\\n]*)`,
@@ -120,11 +177,8 @@ function handlePlan(filePath, prdContent) {
   );
 
   if (!specLineRe.test(prdContent)) {
-    const anchor = '<!-- 无法关联到 spec 的推断需求,等待人工正式化 -->';
-    if (!prdContent.includes(anchor)) return null;
-    const entry = `\n- **Plan 孤儿**: ${filePath}（未找到对应 spec: ${specFileName}）\n`;
-    dbg('adding orphan plan entry');
-    return prdContent.replace(anchor, anchor + entry);
+    dbg('SKIP: spec not found in PRD content');
+    return null;
   }
 
   dbg('adding plan to REQ entry');
