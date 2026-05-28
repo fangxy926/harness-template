@@ -3,3 +3,4 @@
 .claude/hook-state.json
 .omc/
 .venv/
+.gstack/

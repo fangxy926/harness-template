@@ -6,6 +6,13 @@
 ## 当前需求
 
 <!-- REQ 条目自动追加于此 -->
+### 2026-05-28-记住我复选框
+- **Spec**: docs/superpowers/specs/2026-05-28-remember-me-design.md
+- **Plan**: docs/superpowers/plans/2026-05-28-remember-me.md
+- **状态**: 待实施
+- **创建**: 2026-05-28
+- **摘要**: 在现有登录页面（`src/login.html`）的密码框与登录按钮之间，插入一个纯静态「记住我」复选框。无 JavaScript，无任何行为逻辑，仅视觉呈现。
+
 ### 2026-05-28-登录页面
 - **Spec**: docs/superpowers/specs/2026-05-28-login-page-design.md
 - **Plan**: docs/superpowers/plans/2026-05-28-login-page.md

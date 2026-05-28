@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### feat
+- 2026-05-28 11:23:12 `be78428` feat(login): 添加「记住我」复选框 (`login.html`) ([2026-05-28-登录页面](docs/superpowers/specs/2026-05-28-login-page-design.md))
 - 2026-05-28 11:12:44 `ee448b1` feat: 创建登录页面 HTML 文件 (`login.html`) ([2026-05-28-登录页面](docs/superpowers/specs/2026-05-28-login-page-design.md))
 ### fix
 ### docs

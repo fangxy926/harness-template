@@ -110,17 +110,14 @@ function extractSpecPath(block) {
   return m ? m[1] : null;
 }
 
-function findActiveReqFallback(prdContent) {
-  const re = /### (\d{4}-\d{2}-\d{2}-.+)/g;
-  let match;
-  while ((match = re.exec(prdContent)) !== null) {
-    const title    = match[1].trim();
-    const blockEnd = prdContent.indexOf('\n###', match.index + 1);
-    const block    = blockEnd > -1 ? prdContent.slice(match.index, blockEnd) : prdContent.slice(match.index);
-    const st       = block.match(/\*\*状态\*\*:\s*(待实施|实施中)/);
-    if (st) return { id: title, status: st[1], specPath: extractSpecPath(block) };
-  }
-  return null;
+function findFirstReq(prdContent) {
+  const match = /### (\d{4}-\d{2}-\d{2}-.+)/.exec(prdContent);
+  if (!match) return null;
+  const title      = match[1].trim();
+  const blockStart = prdContent.indexOf('### ' + title);
+  const blockEnd   = prdContent.indexOf('\n### ', blockStart + 1);
+  const block      = blockEnd > -1 ? prdContent.slice(blockStart, blockEnd) : prdContent.slice(blockStart);
+  return { id: title, specPath: extractSpecPath(block) };
 }
 
 function findReqByFiles(files, prdContent) {
@@ -128,45 +125,64 @@ function findReqByFiles(files, prdContent) {
   let planFiles = [];
   try { planFiles = fs.readdirSync(plansDir).filter(f => f.endsWith('.md')); } catch (e) {}
 
-  for (const { file } of files) {
-    const fileName = path.basename(file);
-    for (const planFile of planFiles) {
-      let planContent = '';
-      try { planContent = fs.readFileSync(path.join(PROJECT_ROOT, 'docs/superpowers/plans', planFile), 'utf8'); } catch (e) { continue; }
-      if (!planContent.includes(fileName)) continue;
+  // 收集所有「plan 文件内容提及任一变更文件」的候选项
+  const candidates = [];
+  for (const planFile of planFiles) {
+    let planContent = '';
+    try { planContent = fs.readFileSync(path.join(PROJECT_ROOT, 'docs/superpowers/plans', planFile), 'utf8'); } catch (e) { continue; }
 
-      const planRef     = `docs/superpowers/plans/${planFile}`;
-      const planLineIdx = prdContent.indexOf(`**Plan**: ${planRef}`);
-      if (planLineIdx === -1) continue;
+    const mentioned = files.some(({ file }) =>
+      planContent.includes(file) || planContent.includes(path.basename(file))
+    );
+    if (!mentioned) continue;
 
-      const before      = prdContent.slice(0, planLineIdx);
-      const headings    = [...before.matchAll(/### (\d{4}-\d{2}-\d{2}-[^\n]+)/g)];
-      if (!headings.length) continue;
+    const planRef     = `docs/superpowers/plans/${planFile}`;
+    const planLineIdx = prdContent.indexOf(`**Plan**: ${planRef}`);
+    if (planLineIdx === -1) continue;
 
-      const reqTitle  = headings[headings.length - 1][1].trim();
-      const blockStart = prdContent.lastIndexOf('### ' + reqTitle, planLineIdx);
-      const blockEnd   = prdContent.indexOf('\n### ', blockStart + 1);
-      const block      = blockEnd > -1 ? prdContent.slice(blockStart, blockEnd) : prdContent.slice(blockStart);
-      const st         = block.match(/\*\*状态\*\*:\s*(待实施|实施中)/);
-      if (st) {
-        dbg(`findReqByFiles: ${fileName} → ${planFile} → ${reqTitle}`);
-        return { id: reqTitle, status: st[1], specPath: extractSpecPath(block) };
-      }
-    }
+    const before   = prdContent.slice(0, planLineIdx);
+    const headings = [...before.matchAll(/### (\d{4}-\d{2}-\d{2}-[^\n]+)/g)];
+    if (!headings.length) continue;
+
+    const reqTitle   = headings[headings.length - 1][1].trim();
+    const blockStart = prdContent.lastIndexOf('### ' + reqTitle, planLineIdx);
+    const blockEnd   = prdContent.indexOf('\n### ', blockStart + 1);
+    const block      = blockEnd > -1 ? prdContent.slice(blockStart, blockEnd) : prdContent.slice(blockStart);
+    candidates.push({ planFile, planRef, reqTitle, specPath: extractSpecPath(block) });
   }
 
-  dbg('findReqByFiles: no match, fallback');
-  return findActiveReqFallback(prdContent);
+  if (candidates.length === 0) {
+    dbg('findReqByFiles: no match, fallback to first REQ');
+    return findFirstReq(prdContent);
+  }
+
+  if (candidates.length === 1) {
+    dbg(`findReqByFiles: single match → ${candidates[0].reqTitle}`);
+    return { id: candidates[0].reqTitle, specPath: candidates[0].specPath };
+  }
+
+  // 多个候选：取 plan 文件最近一次 git commit 时间戳最大的那个
+  const withDates = candidates.map(c => {
+    let commitTime = 0;
+    try { commitTime = parseInt(run(`git log -1 --format=%ct -- "${c.planRef}"`), 10) || 0; } catch (e) {}
+    return { ...c, commitTime };
+  });
+  withDates.sort((a, b) => b.commitTime - a.commitTime);
+  const winner = withDates[0];
+  dbg(`findReqByFiles: ${candidates.length} candidates, newest plan commit → ${winner.reqTitle} (${winner.planFile})`);
+  return { id: winner.reqTitle, specPath: winner.specPath };
 }
 
 // ─── PRD 状态升级 ──────────────────────────────────────────────────────────────
 
 function promotePrdStatus(prdContent, req) {
-  if (!req || req.status !== '待实施') return null;
+  if (!req) return null;
   const blockStart = prdContent.indexOf('### ' + req.id);
-  const blockEnd   = prdContent.indexOf('\n### ', blockStart + 1);
-  const block      = blockEnd > -1 ? prdContent.slice(blockStart, blockEnd) : prdContent.slice(blockStart);
-  const updated    = block.replace('- **状态**: 待实施', '- **状态**: 实施中');
+  if (blockStart === -1) return null;
+  const blockEnd = prdContent.indexOf('\n### ', blockStart + 1);
+  const block    = blockEnd > -1 ? prdContent.slice(blockStart, blockEnd) : prdContent.slice(blockStart);
+  if (!block.includes('- **状态**: 待实施')) return null;
+  const updated  = block.replace('- **状态**: 待实施', '- **状态**: 实施中');
   return blockEnd > -1
     ? prdContent.slice(0, blockStart) + updated + prdContent.slice(blockEnd)
     : prdContent.slice(0, blockStart) + updated;
