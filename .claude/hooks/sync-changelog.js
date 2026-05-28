@@ -75,7 +75,8 @@ function isProductionFile(file) {
   if (!file) return false;
   if (file.includes('docs/superpowers/')) return false;
   if (file === 'docs/PRD.md' || file === 'docs/CHANGELOG.md') return false;
-  if (file.startsWith('.claude/')) return false;
+  // 跳过 .claude/ 下的配置/状态文件，但保留 hooks/ 脚本（有意义的代码变更）
+  if (file.startsWith('.claude/') && !file.startsWith('.claude/hooks/')) return false;
   if (/(\.(test|spec)\.[^.]+$|[/\\](tests?|__tests?__|spec)[/\\])/i.test(file)) return false;
   return true;
 }
