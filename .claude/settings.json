@@ -19,7 +19,12 @@
             "type": "command",
             "command": "node .claude/hooks/sync-prd.js",
             "timeout": 15
-          },
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
           {
             "type": "command",
             "command": "node .claude/hooks/sync-changelog.js",
